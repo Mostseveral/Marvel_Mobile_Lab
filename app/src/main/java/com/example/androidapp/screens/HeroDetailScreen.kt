@@ -1,5 +1,6 @@
 package com.example.androidapp.screens
 
+import android.util.Log
 import androidx.navigation.NavController
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
@@ -19,58 +20,97 @@ import androidx.compose.ui.unit.dp
 
 
 @Composable
-fun HeroDetailScreen(navController: NavController, name: String, image: String, description: String) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-    ) {
-        // Фоновая картинка героя
-        Image(
-            painter = rememberAsyncImagePainter(image),
-            contentDescription = null,
-            modifier = Modifier
-                .fillMaxSize() // Картинка растянута на весь экран
-                .align(Alignment.Center), // Картинка выравнивается по центру
-            contentScale = ContentScale.Crop // Кропим, чтобы избежать полос
-        )
+fun HeroDetailScreen(
+    navController: NavController,
+    name: String,
+    image: String,
+    description: String
+) {
+    // Используем rememberAsyncImagePainter для загрузки изображения по URL
+    val painter = rememberAsyncImagePainter(
+        model = image,
+        placeholder = painterResource(id = R.drawable.placeholder), // Плейсхолдер
+        error = painterResource(id = R.drawable.error_image) // Изображение ошибки
+    )
 
-        @Composable
-        fun BackButton(navController: NavController) {
-            IconButton(onClick = { navController.popBackStack() }) {
+    val state = painter.state
+
+    Box(
+        modifier = Modifier.fillMaxSize()
+    ) {
+        when (state) {
+            is coil.compose.AsyncImagePainter.State.Loading -> {
+                // Показываем placeholder, пока изображение загружается
                 Image(
-                    painter = painterResource(id = R.drawable.baseline_arrow_back_24),
-                    contentDescription = "кнопка назад",
-                    modifier = Modifier.size(50.dp)
-                    ,
+                    painter = painterResource(id = R.drawable.placeholder),
+                    contentDescription = "Loading...",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            }
+            is coil.compose.AsyncImagePainter.State.Success -> {
+                // Показываем загруженное изображение
+                Image(
+                    painter = painter,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            }
+            is coil.compose.AsyncImagePainter.State.Error -> {
+                // Показываем изображение ошибки, если загрузка не удалась
+                Image(
+                    painter = painterResource(id = R.drawable.error_image),
+                    contentDescription = "Error",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            }
+            else -> {
+                // Запасной вариант (должно быть покрыто выше)
+                Image(
+                    painter = painterResource(id = R.drawable.placeholder),
+                    contentDescription = "Default",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
                 )
             }
         }
-        BackButton(navController = navController)
 
-        // Имя и описание героя внизу по центру
+        // Кнопка "Назад"
+        IconButton(
+            onClick = { navController.popBackStack() },
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(16.dp)
+        ) {
+            Image(
+                painter = painterResource(id = R.drawable.baseline_arrow_back_24),
+                contentDescription = "Кнопка назад",
+                modifier = Modifier.size(50.dp)
+            )
+        }
+
+        // Текст с описанием героя
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(15.dp)
-                .align(Alignment.BottomCenter) // Контент внизу по центру
+                .align(Alignment.BottomCenter)
         ) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.align(Alignment.BottomCenter) // Выравнивание снизу по центру
+                modifier = Modifier.align(Alignment.BottomCenter)
             ) {
-                // Имя героя
                 Text(
                     text = name,
                     style = Typography.titleLarge,
                     color = Color.White,
                     textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .padding(bottom = 10.dp) // Отступ от текста
+                    modifier = Modifier.padding(bottom = 10.dp)
                 )
-
-                // Описание героя
                 Text(
-                    text = description,
+                    text = description.ifBlank { "Cool Marvel Hero." },
                     style = Typography.bodyLarge,
                     color = Color.White,
                     textAlign = TextAlign.Center,
@@ -80,5 +120,3 @@ fun HeroDetailScreen(navController: NavController, name: String, image: String, 
         }
     }
 }
-
-

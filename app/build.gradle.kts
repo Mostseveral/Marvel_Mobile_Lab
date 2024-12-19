@@ -50,12 +50,19 @@ android {
 }
 
 dependencies {
+
+
     val nav_version = "2.8.2"
+    implementation ("androidx.compose.runtime:runtime:1.5.1") // или последняя версия
+    implementation ("androidx.compose.foundation:foundation:1.5.1")
+    implementation ("com.squareup.retrofit2:retrofit:2.9.0")
+    implementation ("com.squareup.retrofit2:converter-gson:2.9.0")
+    implementation ("com.squareup.okhttp3:logging-interceptor:4.9.3")
 
     implementation("androidx.navigation:navigation-compose:$nav_version")
-    implementation("io.coil-kt:coil-compose:2.0.0-rc03")
+    implementation("io.coil-kt:coil-compose:2.4.0")
     implementation("androidx.compose.material:material:1.0.0")
-    implementation("androidx.compose.foundation:foundation:1.5.0")
+
     implementation("androidx.compose.ui:ui-tooling-preview:1.5.0")
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
