@@ -121,6 +121,7 @@ class HeroRepository {
             if (heroesBatch.isNotEmpty()) {
                 allHeroes.addAll(heroesBatch.map {
                     Hero(
+                        id = it.id,
                         name = it.name,
                         image = it.thumbnail.fullPath,
                         description = it.description
@@ -195,11 +196,11 @@ fun HeroListScreen(navController: NavController, heroRepository: HeroRepository 
             content = {
                 items(heroes.size) { index ->
                     val hero = heroes[index]
-                    HeroListItem(hero = hero) {
+                    HeroListItem(hero = hero, onClick =  {
                         navController.navigate(
                             "hero_detail/${Uri.encode(hero.name)}/${Uri.encode(hero.image)}/${Uri.encode(hero.description)}"
                         )
-                    }
+                    })
                 }
             }
         )
@@ -240,4 +241,4 @@ fun HeroListItem(hero: Hero, onClick: () -> Unit) {
     }
 }
 
-data class Hero(val name: String, val image: String, val description: String)
+data class Hero(val name: String, val image: String, val description: String, val id: Int)

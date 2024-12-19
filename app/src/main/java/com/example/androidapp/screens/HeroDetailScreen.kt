@@ -20,97 +20,61 @@ import androidx.compose.ui.unit.dp
 
 
 @Composable
-fun HeroDetailScreen(
-    navController: NavController,
-    name: String,
-    image: String,
-    description: String
-) {
-    // Используем rememberAsyncImagePainter для загрузки изображения по URL
-    val painter = rememberAsyncImagePainter(
-        model = image,
-        placeholder = painterResource(id = R.drawable.placeholder), // Плейсхолдер
-        error = painterResource(id = R.drawable.error_image) // Изображение ошибки
-    )
-
-    val state = painter.state
+fun HeroDetailScreen(navController: NavController, name: String, image: String, description: String) {
+    // Замена http на https
+    val secureImage = image.replace("http://", "https://")
+    Log.d("HeroDetailScreen", "Image URL: $secureImage")
 
     Box(
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier
+            .fillMaxSize()
     ) {
-        when (state) {
-            is coil.compose.AsyncImagePainter.State.Loading -> {
-                // Показываем placeholder, пока изображение загружается
-                Image(
-                    painter = painterResource(id = R.drawable.placeholder),
-                    contentDescription = "Loading...",
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
-            }
-            is coil.compose.AsyncImagePainter.State.Success -> {
-                // Показываем загруженное изображение
-                Image(
-                    painter = painter,
-                    contentDescription = null,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
-            }
-            is coil.compose.AsyncImagePainter.State.Error -> {
-                // Показываем изображение ошибки, если загрузка не удалась
-                Image(
-                    painter = painterResource(id = R.drawable.error_image),
-                    contentDescription = "Error",
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
-            }
-            else -> {
-                // Запасной вариант (должно быть покрыто выше)
-                Image(
-                    painter = painterResource(id = R.drawable.placeholder),
-                    contentDescription = "Default",
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
-            }
-        }
-
-        // Кнопка "Назад"
-        IconButton(
-            onClick = { navController.popBackStack() },
+        // Фоновая картинка героя
+        Image(
+            painter = rememberAsyncImagePainter(secureImage),
+            contentDescription = null,
             modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(16.dp)
-        ) {
-            Image(
-                painter = painterResource(id = R.drawable.baseline_arrow_back_24),
-                contentDescription = "Кнопка назад",
-                modifier = Modifier.size(50.dp)
-            )
-        }
+                .fillMaxSize()
+                .align(Alignment.Center),
+            contentScale = ContentScale.Crop
+        )
 
-        // Текст с описанием героя
+        @Composable
+        fun BackButton(navController: NavController) {
+            IconButton(onClick = { navController.popBackStack() }) {
+                Image(
+                    painter = painterResource(id = R.drawable.baseline_arrow_back_24),
+                    contentDescription = "кнопка назад",
+                    modifier = Modifier.size(50.dp),
+                )
+            }
+        }
+        BackButton(navController = navController)
+
+        // Имя и описание героя внизу по центру
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(15.dp)
-                .align(Alignment.BottomCenter)
+                .align(Alignment.BottomCenter) // Контент внизу по центру
         ) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.align(Alignment.BottomCenter)
+                modifier = Modifier.align(Alignment.BottomCenter) // Выравнивание снизу по центру
             ) {
+                // Имя героя
                 Text(
                     text = name,
                     style = Typography.titleLarge,
                     color = Color.White,
                     textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(bottom = 10.dp)
+                    modifier = Modifier
+                        .padding(bottom = 10.dp) // Отступ от текста
                 )
+
+                // Описание героя
                 Text(
-                    text = description.ifBlank { "Cool Marvel Hero." },
+                    text = description,
                     style = Typography.bodyLarge,
                     color = Color.White,
                     textAlign = TextAlign.Center,
