@@ -30,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -46,6 +47,9 @@ import retrofit2.http.Query
 import java.math.BigInteger
 import java.security.MessageDigest
 import java.util.Date
+import com.example.androidapp.database.AppDatabase
+import com.example.androidapp.database.toEntity
+import com.example.androidapp.database.toUI
 
 data class MarvelResponse(
     val data: MarvelData
@@ -82,6 +86,8 @@ interface MarvelApiService {
     ): MarvelResponse
 }
 
+
+
 object MarvelApiClient {
     private const val BASE_URL = "https://gateway.marvel.com/"
     private const val PUBLIC_KEY = "06f972f918b3a1ea16ed02be244bd1dd"
@@ -112,59 +118,82 @@ object MarvelApiClient {
     }
 }
 
-class HeroRepository {
+class HeroRepository(private val db: AppDatabase) {
+
     suspend fun getAllHeroes(offset: Int, limit: Int = 10): List<Hero> {
         val allHeroes = mutableListOf<Hero>()
         try {
+            // Получаем героев из сети
             val heroesBatch = MarvelApiClient.getHeroes(limit, offset)
-            Log.d("HeroRepository", "Loaded ${heroesBatch.size} heroes at offset $offset")
-            if (heroesBatch.isNotEmpty()) {
-                allHeroes.addAll(heroesBatch.map {
-                    Hero(
-                        id = it.id,
-                        name = it.name,
-                        image = it.thumbnail.fullPath,
-                        description = it.description
-                    )
-                })
+            Log.d("HeroRepository", "Герои загружены на offset $offset, общее количество: ${heroesBatch.size}")
+
+            // Проверяем, нужно ли добавлять героев в базу данных
+            val existingHeroesIds = db.characterDao().getAllHeroes().map { it.id }
+            val newHeroes = heroesBatch.filter { hero ->
+                !existingHeroesIds.contains(hero.id) // Если герой с таким id уже есть, то его не добавляем
             }
+
+            // Сохраняем только новых героев
+            if (newHeroes.isNotEmpty()) {
+                db.characterDao().insertAll(newHeroes.map { it.toEntity() })
+                Log.d("HeroRepository", "Герои сохранены в базу данных, количество: ${newHeroes.size}")
+            } else {
+                Log.d("HeroRepository", "Все герои уже находятся в базе данных.")
+            }
+
+            // Читаем героев из базы данных
+            val heroesFromDb = db.characterDao().getAllHeroes()
+            allHeroes.addAll(heroesFromDb.map { it.toUI() })
+            Log.d("HeroRepository", "Герои загружены из базы данных, количество: ${heroesFromDb.size}")
+
         } catch (e: Exception) {
-            Log.e("HeroRepository", "Error loading heroes: ${e.message}", e)
+            Log.e("HeroRepository", "Ошибка при загрузке героев: ${e.message}", e)
         }
-        Log.d("HeroRepository", "Total loaded heroes: ${allHeroes.size}")
+        Log.d("HeroRepository", "Общее количество загруженных героев: ${allHeroes.size}")
         return allHeroes
     }
 }
 
 @Composable
-fun HeroListScreen(navController: NavController, heroRepository: HeroRepository = HeroRepository()) {
+fun HeroListScreen(navController: NavController, heroRepository: HeroRepository = HeroRepository(AppDatabase.getDatabase(context = LocalContext.current))) {
     var heroes by remember { mutableStateOf(emptyList<Hero>()) }
     var isLoading by remember { mutableStateOf(false) }
     var offset by remember { mutableStateOf(0) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+
     val listState = rememberLazyListState()
     val snapBehavior = rememberSnapFlingBehavior(lazyListState = listState)
 
+    // Функция для загрузки героев
     suspend fun loadMoreHeroes() {
         if (isLoading) return
         isLoading = true
         try {
+            Log.d("HeroListScreen", "Загрузка героев на offset $offset начата")
             val newHeroes = heroRepository.getAllHeroes(offset)
-            heroes = heroes + newHeroes
+            Log.d("HeroListScreen", "Загружено ${newHeroes.size} новых героев")
+
+            // Добавляем новых героев в список без дублирования
+            val uniqueHeroes = heroes + newHeroes.filter { newHero ->
+                heroes.none { it.id == newHero.id }
+            }
+            heroes = uniqueHeroes
             offset += newHeroes.size
-            errorMessage = null // Сбрасываем сообщение об ошибке, если всё успешно
+            errorMessage = null // Сброс сообщения об ошибке, если все прошло успешно
         } catch (e: Exception) {
-            Log.e("HeroListScreen", "Error loading heroes: ${e.message}", e)
-            errorMessage = "Failed to load heroes. Please check your internet connection."
+            Log.e("HeroListScreen", "Ошибка при загрузке героев: ${e.message}", e)
+            errorMessage = "Не удалось загрузить героев. Проверьте интернет-соединение."
         } finally {
             isLoading = false
         }
     }
 
+    // Загружаем героев при первом рендере
     LaunchedEffect(Unit) {
         loadMoreHeroes()
     }
 
+    // Загружаем героев при прокрутке
     LaunchedEffect(listState) {
         snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull() }
             .collect { visibleItem ->
@@ -198,6 +227,7 @@ fun HeroListScreen(navController: NavController, heroRepository: HeroRepository 
             style = Typography.titleLarge
         )
 
+        // Отображаем сообщение об ошибке, если оно есть
         if (errorMessage != null) {
             Text(
                 text = errorMessage!!,
@@ -209,6 +239,7 @@ fun HeroListScreen(navController: NavController, heroRepository: HeroRepository 
                     .padding(16.dp)
             )
         } else {
+            // Отображаем список героев
             LazyRow(
                 state = listState,
                 flingBehavior = snapBehavior,
