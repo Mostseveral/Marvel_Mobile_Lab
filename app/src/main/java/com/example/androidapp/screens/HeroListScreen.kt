@@ -141,16 +141,24 @@ fun HeroListScreen(navController: NavController, heroRepository: HeroRepository 
     var heroes by remember { mutableStateOf(emptyList<Hero>()) }
     var isLoading by remember { mutableStateOf(false) }
     var offset by remember { mutableStateOf(0) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
     val listState = rememberLazyListState()
     val snapBehavior = rememberSnapFlingBehavior(lazyListState = listState)
 
     suspend fun loadMoreHeroes() {
-        if (isLoading) return  // Не загружать снова, если уже идет процесс загрузки
+        if (isLoading) return
         isLoading = true
-        val newHeroes = heroRepository.getAllHeroes(offset)
-        heroes = heroes + newHeroes
-        offset += newHeroes.size
-        isLoading = false
+        try {
+            val newHeroes = heroRepository.getAllHeroes(offset)
+            heroes = heroes + newHeroes
+            offset += newHeroes.size
+            errorMessage = null // Сбрасываем сообщение об ошибке, если всё успешно
+        } catch (e: Exception) {
+            Log.e("HeroListScreen", "Error loading heroes: ${e.message}", e)
+            errorMessage = "Failed to load heroes. Please check your internet connection."
+        } finally {
+            isLoading = false
+        }
     }
 
     LaunchedEffect(Unit) {
@@ -190,20 +198,32 @@ fun HeroListScreen(navController: NavController, heroRepository: HeroRepository 
             style = Typography.titleLarge
         )
 
-        LazyRow(
-            state = listState,
-            flingBehavior = snapBehavior,
-            content = {
-                items(heroes.size) { index ->
-                    val hero = heroes[index]
-                    HeroListItem(hero = hero, onClick =  {
-                        navController.navigate(
-                            "hero_detail/${Uri.encode(hero.name)}/${Uri.encode(hero.image)}/${Uri.encode(hero.description)}"
-                        )
-                    })
+        if (errorMessage != null) {
+            Text(
+                text = errorMessage!!,
+                color = Color.Red,
+                style = Typography.bodyLarge,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            )
+        } else {
+            LazyRow(
+                state = listState,
+                flingBehavior = snapBehavior,
+                content = {
+                    items(heroes.size) { index ->
+                        val hero = heroes[index]
+                        HeroListItem(hero = hero, onClick = {
+                            navController.navigate(
+                                "hero_detail/${Uri.encode(hero.name)}/${Uri.encode(hero.image)}/${Uri.encode(hero.description)}"
+                            )
+                        })
+                    }
                 }
-            }
-        )
+            )
+        }
     }
 }
 
