@@ -31,21 +31,13 @@ fun HeroApp(navController: NavHostController) {
             HeroListScreen(navController = navController)
         }
         composable(
-            route = "hero_detail/{name}/{image}/{description}",
-            arguments = listOf(
-                navArgument("name") { type = NavType.StringType },
-                navArgument("image") { type = NavType.StringType },
-                navArgument("description") { type = NavType.StringType }
-            )
+            route = "hero_detail/{heroId}",
+            arguments = listOf(navArgument("heroId") { type = NavType.IntType })
         ) { backStackEntry ->
-            val name = backStackEntry.arguments?.getString("name") ?: ""
-            val image = backStackEntry.arguments?.getString("image") ?: ""
-            val description = backStackEntry.arguments?.getString("description") ?: ""
+            val heroId = backStackEntry.arguments?.getInt("heroId") ?: 0
             HeroDetailScreen(
                 navController = navController,
-                name = name,
-                image = image,
-                description = description
+                heroId = heroId
             )
         }
     }

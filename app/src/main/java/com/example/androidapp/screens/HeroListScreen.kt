@@ -1,6 +1,5 @@
 package com.example.androidapp.screens
 
-import android.net.Uri
 import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -17,10 +16,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+//noinspection UsingMaterialAndMaterial3Libraries
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -48,6 +49,7 @@ import java.math.BigInteger
 import java.security.MessageDigest
 import java.util.Date
 import com.example.androidapp.database.AppDatabase
+import com.example.androidapp.database.CharacterEntity
 import com.example.androidapp.database.toEntity
 import com.example.androidapp.database.toUI
 
@@ -106,7 +108,7 @@ object MarvelApiClient {
             .build()
     }
 
-    val service: MarvelApiService by lazy {
+    private val service: MarvelApiService by lazy {
         retrofit.create(MarvelApiService::class.java)
     }
 
@@ -125,7 +127,7 @@ class HeroRepository(private val db: AppDatabase) {
         try {
             // Получаем героев из сети
             val heroesBatch = MarvelApiClient.getHeroes(limit, offset)
-            Log.d("HeroRepository", "Герои загружены на offset $offset, общее количество: ${heroesBatch.size}")
+
 
             // Проверяем, нужно ли добавлять героев в базу данных
             val existingHeroesIds = db.characterDao().getAllHeroes().map { it.id }
@@ -136,21 +138,25 @@ class HeroRepository(private val db: AppDatabase) {
             // Сохраняем только новых героев
             if (newHeroes.isNotEmpty()) {
                 db.characterDao().insertAll(newHeroes.map { it.toEntity() })
-                Log.d("HeroRepository", "Герои сохранены в базу данных, количество: ${newHeroes.size}")
-            } else {
-                Log.d("HeroRepository", "Все герои уже находятся в базе данных.")
+                Log.d("HeroRepository", "heroes saved to db: ${newHeroes.size}")
             }
 
             // Читаем героев из базы данных
             val heroesFromDb = db.characterDao().getAllHeroes()
             allHeroes.addAll(heroesFromDb.map { it.toUI() })
-            Log.d("HeroRepository", "Герои загружены из базы данных, количество: ${heroesFromDb.size}")
 
         } catch (e: Exception) {
-            Log.e("HeroRepository", "Ошибка при загрузке героев: ${e.message}", e)
+            Log.e("HeroRepository", "Loading error: ${e.message}", e)
         }
-        Log.d("HeroRepository", "Общее количество загруженных героев: ${allHeroes.size}")
         return allHeroes
+    }
+    suspend fun getHeroById(id: Int): Hero? {
+        val entity = db.characterDao().getCharacterById(id)
+        return entity?.toUI()
+    }
+
+    suspend fun insertHero(hero: CharacterEntity) {
+        db.characterDao().insertAll(listOf(hero))
     }
 }
 
@@ -158,7 +164,7 @@ class HeroRepository(private val db: AppDatabase) {
 fun HeroListScreen(navController: NavController, heroRepository: HeroRepository = HeroRepository(AppDatabase.getDatabase(context = LocalContext.current))) {
     var heroes by remember { mutableStateOf(emptyList<Hero>()) }
     var isLoading by remember { mutableStateOf(false) }
-    var offset by remember { mutableStateOf(0) }
+    var offset by remember { mutableIntStateOf(0) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     val listState = rememberLazyListState()
@@ -169,9 +175,7 @@ fun HeroListScreen(navController: NavController, heroRepository: HeroRepository 
         if (isLoading) return
         isLoading = true
         try {
-            Log.d("HeroListScreen", "Загрузка героев на offset $offset начата")
             val newHeroes = heroRepository.getAllHeroes(offset)
-            Log.d("HeroListScreen", "Загружено ${newHeroes.size} новых героев")
 
             // Добавляем новых героев в список без дублирования
             val uniqueHeroes = heroes + newHeroes.filter { newHero ->
@@ -181,19 +185,17 @@ fun HeroListScreen(navController: NavController, heroRepository: HeroRepository 
             offset += newHeroes.size
             errorMessage = null // Сброс сообщения об ошибке, если все прошло успешно
         } catch (e: Exception) {
-            Log.e("HeroListScreen", "Ошибка при загрузке героев: ${e.message}", e)
-            errorMessage = "Не удалось загрузить героев. Проверьте интернет-соединение."
+            Log.e("HeroListScreen", "Loading error: ${e.message}", e)
+            errorMessage = "Cant load, check connection to network"
         } finally {
             isLoading = false
         }
     }
 
-    // Загружаем героев при первом рендере
     LaunchedEffect(Unit) {
         loadMoreHeroes()
     }
 
-    // Загружаем героев при прокрутке
     LaunchedEffect(listState) {
         snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull() }
             .collect { visibleItem ->
@@ -226,8 +228,6 @@ fun HeroListScreen(navController: NavController, heroRepository: HeroRepository 
             color = Color.White,
             style = Typography.titleLarge
         )
-
-        // Отображаем сообщение об ошибке, если оно есть
         if (errorMessage != null) {
             Text(
                 text = errorMessage!!,
@@ -239,7 +239,6 @@ fun HeroListScreen(navController: NavController, heroRepository: HeroRepository 
                     .padding(16.dp)
             )
         } else {
-            // Отображаем список героев
             LazyRow(
                 state = listState,
                 flingBehavior = snapBehavior,
@@ -247,9 +246,7 @@ fun HeroListScreen(navController: NavController, heroRepository: HeroRepository 
                     items(heroes.size) { index ->
                         val hero = heroes[index]
                         HeroListItem(hero = hero, onClick = {
-                            navController.navigate(
-                                "hero_detail/${Uri.encode(hero.name)}/${Uri.encode(hero.image)}/${Uri.encode(hero.description)}"
-                            )
+                            navController.navigate("hero_detail/${hero.id}")
                         })
                     }
                 }
